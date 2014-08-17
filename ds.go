@@ -10,44 +10,44 @@ import (
 	"github.com/stacktic/dropbox"
 )
 
-func readCursor(filename string) (cursor string, err error) {
-	cursorBytes, err := ioutil.ReadFile(filename)
+type DropboxSync struct {
+	Dropbox   *dropbox.Dropbox
+	Directory string
+}
+
+func (ds *DropboxSync) readCursor() (cursor string, err error) {
+	cursorBytes, err := ioutil.ReadFile(path.Join(ds.Directory, ".dropbox"))
 	cursor = string(cursorBytes)
 	return
 }
 
-func writeCursor(filename string, cursor string) (err error) {
-	return ioutil.WriteFile(filename, []byte(cursor), 0644)
+func (ds *DropboxSync) writeCursor(cursor string) (err error) {
+	return ioutil.WriteFile(path.Join(ds.Directory, ".dropbox"), []byte(cursor), 0644)
 }
 
-func createFolder(entry dropbox.DeltaEntry) error {
+func (ds *DropboxSync) createFolder(entry dropbox.DeltaEntry) error {
 	trimmedPath := entry.Entry.Path[1:]
 	paths := strings.Split(trimmedPath, "/")
-	localPath := path.Join(append([]string{"tmp"}, paths...)...)
+	localPath := path.Join(append([]string{ds.Directory}, paths...)...)
 	return os.MkdirAll(localPath, 0755)
 }
 
-func fetchFile(db *dropbox.Dropbox, entry dropbox.DeltaEntry) error {
+func (ds *DropboxSync) fetchFile(entry dropbox.DeltaEntry) error {
 	src := entry.Entry.Path
 	rev := entry.Entry.Revision
-	dst := "tmp/" + entry.Entry.Path
+	dst := ds.Directory + entry.Entry.Path
 
-	return db.DownloadToFile(src, dst, rev)
+	return ds.Dropbox.DownloadToFile(src, dst, rev)
 }
 
-func remove(entry dropbox.DeltaEntry) error {
-	dst := "tmp" + entry.Path
+func (ds *DropboxSync) remove(entry dropbox.DeltaEntry) error {
+	dst := ds.Directory + entry.Path
 	return os.Remove(dst)
 }
 
-func main() {
-	token := os.Getenv("DROPBOX_TOKEN")
-	db := dropbox.NewDropbox()
-	db.RootDirectory = "auto"
-	db.SetAccessToken(token)
-
-	cursor, err := readCursor("tmp/.dropbox")
-	delta, err := db.Delta(cursor, "/")
+func (ds *DropboxSync) Sync() error {
+	cursor, err := ds.readCursor()
+	delta, err := ds.Dropbox.Delta(cursor, "/")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -55,13 +55,32 @@ func main() {
 	for _, entry := range delta.Entries {
 		switch {
 		case entry.Entry == nil:
-			remove(entry)
+			ds.remove(entry)
 		case entry.Entry.IsDir == false:
-			fetchFile(db, entry)
+			ds.fetchFile(entry)
 		default:
-			createFolder(entry)
+			ds.createFolder(entry)
 		}
 	}
 
-	writeCursor("tmp/.dropbox", delta.Cursor)
+	ds.writeCursor(delta.Cursor)
+	return nil
+}
+
+func NewDropboxSync(token string) *DropboxSync {
+	db := dropbox.NewDropbox()
+	db.RootDirectory = "auto"
+	db.SetAccessToken(token)
+
+	ds := &DropboxSync{
+		Dropbox:   db,
+		Directory: "tmp",
+	}
+	return ds
+}
+
+func main() {
+	token := os.Getenv("DROPBOX_TOKEN")
+	ds := NewDropboxSync(token)
+	ds.Sync()
 }
