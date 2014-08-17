@@ -1,4 +1,4 @@
-package main
+package ds
 
 import (
 	"fmt"
@@ -77,10 +77,4 @@ func NewDropboxSync(token string) *DropboxSync {
 		Directory: "tmp",
 	}
 	return ds
-}
-
-func main() {
-	token := os.Getenv("DROPBOX_TOKEN")
-	ds := NewDropboxSync(token)
-	ds.Sync()
 }
