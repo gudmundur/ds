@@ -21,16 +21,25 @@ func writeCursor(filename string, cursor string) (err error) {
 }
 
 func createFolder(entry dropbox.DeltaEntry) (err error) {
-	trimmedPath := strings.TrimLeft(entry.Entry.Path, "/")
+	trimmedPath := entry.Entry.Path[1:]
 	paths := strings.Split(trimmedPath, "/")
 	localPath := path.Join(append([]string{"tmp"}, paths...)...)
 	err = os.MkdirAll(localPath, 0755)
 	return
 }
 
+func fetchFile(db *dropbox.Dropbox, entry dropbox.DeltaEntry) (err error) {
+	src := entry.Entry.Path
+	rev := entry.Entry.Revision
+	dst := "tmp/" + entry.Entry.Path
+
+	return db.DownloadToFile(src, dst, rev)
+}
+
 func main() {
 	token := os.Getenv("DROPBOX_TOKEN")
 	db := dropbox.NewDropbox()
+	db.RootDirectory = "auto"
 	db.SetAccessToken(token)
 
 	cursor, err := readCursor("tmp/.dropbox")
@@ -44,7 +53,7 @@ func main() {
 		case entry.Entry == nil:
 			fmt.Println("delete")
 		case entry.Entry.IsDir == false:
-			fmt.Println("fetch file")
+			fetchFile(db, entry)
 		default:
 			createFolder(entry)
 		}
