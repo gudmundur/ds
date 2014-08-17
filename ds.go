@@ -20,20 +20,24 @@ func writeCursor(filename string, cursor string) (err error) {
 	return ioutil.WriteFile(filename, []byte(cursor), 0644)
 }
 
-func createFolder(entry dropbox.DeltaEntry) (err error) {
+func createFolder(entry dropbox.DeltaEntry) error {
 	trimmedPath := entry.Entry.Path[1:]
 	paths := strings.Split(trimmedPath, "/")
 	localPath := path.Join(append([]string{"tmp"}, paths...)...)
-	err = os.MkdirAll(localPath, 0755)
-	return
+	return os.MkdirAll(localPath, 0755)
 }
 
-func fetchFile(db *dropbox.Dropbox, entry dropbox.DeltaEntry) (err error) {
+func fetchFile(db *dropbox.Dropbox, entry dropbox.DeltaEntry) error {
 	src := entry.Entry.Path
 	rev := entry.Entry.Revision
 	dst := "tmp/" + entry.Entry.Path
 
 	return db.DownloadToFile(src, dst, rev)
+}
+
+func remove(entry dropbox.DeltaEntry) error {
+	dst := "tmp" + entry.Path
+	return os.Remove(dst)
 }
 
 func main() {
@@ -51,7 +55,7 @@ func main() {
 	for _, entry := range delta.Entries {
 		switch {
 		case entry.Entry == nil:
-			fmt.Println("delete")
+			remove(entry)
 		case entry.Entry.IsDir == false:
 			fetchFile(db, entry)
 		default:
@@ -59,5 +63,5 @@ func main() {
 		}
 	}
 
-	//writeCursor("tmp/.dropbox", delta.Cursor)
+	writeCursor("tmp/.dropbox", delta.Cursor)
 }
