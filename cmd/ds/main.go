@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/gudmundur/ds/ds"
+	"github.com/gudmundur/ds"
 )
 
 func main() {
