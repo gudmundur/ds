@@ -63,7 +63,7 @@ func (ds *DropboxSync) Sync() error {
 		}
 	}
 
-	ds.writeCursor(delta.Cursor)
+	ds.writeCursor(delta.Cursor.Cursor)
 	return nil
 }
 
